@@ -16,6 +16,9 @@ export class App extends Component {
         loading: false,
         imageGallery: [],
         error: false,
+        toast: false,
+        loadMore: true,
+        totalHits: 0,
     };
 
     handleSearchImg = newImg => {
@@ -34,33 +37,31 @@ export class App extends Component {
     queryImgGallery = async (query, page, prevState) => {
         try {
             this.setState({ loading: true, error: false });
+            const res = await fetchImageGallery(query, page);
+            const { imageGallery } = this.state;
 
-            const queryImg = await fetchImageGallery(query, page);
-
-            if (queryImg.length === 0) {
+            if (!res.hits || res.length === 0) {
                 toast.error('No images found, please change your search query', {
-                    style: { width: '1000px', height: '80px' },
+                    style: { width: '1000px', height: '60px' },
                 });
+                this.setState({ loading: false, loadMore: false });
+            } else {
+                if (!this.state.toast && res.hits.length > 0) {
+                    toast.success('We found images');
+                    this.setState({ toast: true });
+                }
+                this.setState(prevState => ({
+                    imageGallery: [...imageGallery, ...res.hits],
+                    loadMore: page < Math.ceil(res.totalHits / 12),
+                    loading: false,
+                    error: false,
+                    totalHits: res.totalHits,
+                }));
             }
-
-            if (!this.state.toast && queryImg.length > 0) {
-                toast.success('We found images');
-                this.setState({ toast: true });
-            }
-
-            // this.steState(prev =>({
-            //     images: [...prev.images, ...hits],
-            //     loadMore: this.state.page < Math.ceil(totalHits / 12 )
-            // }))
-
-            this.setState(prevState => ({
-                imageGallery: [...prevState.imageGallery],
-            }));
         } catch (error) {
-            this.setState({ error: true });
-        } finally {
-            this.setState({ loading: false });
-        }
+            console.error(error);
+            this.setState({ error: true, loading: false });
+        } 
     };
 
     componentDidUpdate(prevProps, prevState) {
@@ -71,7 +72,7 @@ export class App extends Component {
     }
 
     render() {
-        const { imageGallery, loading, error } = this.state;
+        const { imageGallery, loading, error, loadMore } = this.state;
 
         return (
             <div> 
@@ -81,17 +82,17 @@ export class App extends Component {
                 {imageGallery.length > 0 && (
                     <ImageGallery apiImage={this.state.imageGallery}/>
                 )}
-                {imageGallery.length > 0 && (
+                {loadMore && imageGallery.length > 0 && (
                     <BtnLoadMore onClick={this.handleLoadMore}/>
                 )}
                 <Toaster
                     position="top-right"
                     toastOptions={{
                         style: {
-                        height: '80px',
-                        fontSize: '20px',
-                        fontWeight: '400',
-                        lineHeight: '20px',
+                            height: '40px',
+                            fontSize: '20px',
+                            fontWeight: '400',
+                            lineHeight: '20px',
                         },
                     }}
                 />
