@@ -1,102 +1,90 @@
-import { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchImageGallery } from '../api/PixabayAPI';
-
 import toast, { Toaster } from 'react-hot-toast';
-
 import { SearchBar } from './SearchBar/SearchBar';
 import { ImageGallery } from './ImageGallery/ImageGallery';
 import { BtnLoadMore } from './Button/Button';
 import { Loader } from './Loader/Loader';
 import { Error } from './Error/Error';
 
-export class App extends Component {
-    state = {
-        query: '',
-        page: 1,
-        loading: false,
-        imageGallery: [],
-        error: false,
-        toast: false,
-        loadMore: true,
-        totalHits: 0,
+const App = () => {
+    const [query, setQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [imageGallery, setImageGallery] = useState([]);
+    const [error, setError] = useState(false);
+    const [toastShown, setToastShown] = useState(false);
+    const [loadMore, setLoadMore] = useState(true);
+    const [totalHits, setTotalHits] = useState(0);
+
+    const handleSearchImg = (newImg) => {
+        setQuery(newImg);
+        setPage(1);
+        setImageGallery([]);
+        setToastShown(false);
     };
 
-    handleSearchImg = newImg => {
-        this.setState({
-            query: newImg,
-            page: 1,
-            imageGallery: [],
-            toast: false,
-        });
+    const handleLoadMore = () => {
+        setPage((prevPage) => prevPage + 1);
     };
 
-    handleLoadMore = () => {
-        this.setState(prevState => ({ page: prevState.page + 1}));
-    };
-
-    queryImgGallery = async (query, page, prevState) => {
-        try {
-            this.setState({ loading: true, error: false });
-            const res = await fetchImageGallery(query, page);
-            const { imageGallery } = this.state;
-
-            if (!res.hits || res.length === 0) {
+    useEffect(() => {
+        const queryImgGallery = async (query, page) => {
+            try {
+                setLoading(true);
+                setError(false);
+                const res = await fetchImageGallery(query, page);
+                const { hits, totalHits } = res;
+                
+            if (!hits || hits.length === 0) {
                 toast.error('No images found, please change your search query', {
                     style: { width: '1000px', height: '60px' },
                 });
-                this.setState({ loading: false, loadMore: false });
+                setLoading(false);
+                setLoadMore(false);
             } else {
-                if (!this.state.toast && res.hits.length > 0) {
-                    toast.success('We found images');
-                    this.setState({ toast: true });
+                    if (!toastShown && hits.length > 0) {
+                        toast.success('We found images');
+                        setToastShown(true);
+                    }
+                    setImageGallery((prevGallery) => [...prevGallery, ...hits]);
+                    setLoadMore(page < Math.ceil(totalHits / 12));
+                    setLoading(false);
+                    setError(false);
+                    setTotalHits(totalHits);
                 }
-                this.setState(prevState => ({
-                    imageGallery: [...imageGallery, ...res.hits],
-                    loadMore: page < Math.ceil(res.totalHits / 12),
-                    loading: false,
-                    error: false,
-                    totalHits: res.totalHits,
-                }));
+            } catch (error) {
+                console.error(error);
+                setError(true);
+                setLoading(false);
             }
-        } catch (error) {
-            console.error(error);
-            this.setState({ error: true, loading: false });
-        } 
-    };
+        };
 
-    componentDidUpdate(prevProps, prevState) {
-        if (prevState.query !== this.state.query || prevState.page !== this.state.page) {
-            const { query, page } = this.state;
-            this.queryImgGallery(query, page, prevState);
-        }
-    }
+        queryImgGallery(query, page);
+    }, [query, page, toastShown, totalHits]);
 
-    render() {
-        const { imageGallery, loading, error, loadMore } = this.state;
+    return (
+        <div>
+        <SearchBar onSubmit={handleSearchImg} />
+        {loading && <Loader />}
+        {error && <Error>Whoops! Error! Please reload this page!</Error>}
+        {imageGallery.length > 0 && <ImageGallery apiImage={imageGallery} />}
+        {loadMore && imageGallery.length > 0 && <BtnLoadMore onClick={handleLoadMore} />}
+        <Toaster
+            position="top-right"
+            toastOptions={{
+            style: {
+                height: '40px',
+                fontSize: '20px',
+                fontWeight: '400',
+                lineHeight: '20px',
+            },
+            }}
+        />
+        </div>
+    );
+};
 
-        return (
-            <div> 
-                <SearchBar onSubmit={this.handleSearchImg}/>
-                {loading && <Loader/>}
-                {error && <Error>Whoops! Error! Please reload this page!</Error>}
-                {imageGallery.length > 0 && (
-                    <ImageGallery apiImage={this.state.imageGallery}/>
-                )}
-                {loadMore && imageGallery.length > 0 && (
-                    <BtnLoadMore onClick={this.handleLoadMore}/>
-                )}
-                <Toaster
-                    position="top-right"
-                    toastOptions={{
-                        style: {
-                            height: '40px',
-                            fontSize: '20px',
-                            fontWeight: '400',
-                            lineHeight: '20px',
-                        },
-                    }}
-                />
-            </div>
-        )
-    }
-}
+export default App;
+
+
